@@ -142,6 +142,8 @@ class DataIO(utils):
         """
         transform a meshmodel to voxelmodel. Process one model at one time
         """
+        meshmodel_dir, _ = os.path.split(meshmodel_filepath)
+        info_filepath = os.path.join(meshmodel_dir, "model_normalized.json")
         if dest_samedir:
             dest_directory, _ = os.path.split(meshmodel_filepath)
             output_dir = os.path.join(dest_directory, dest_filename)
@@ -159,7 +161,7 @@ class DataIO(utils):
         else:
             voxel_model = self.transfrom_meshmodel2voxel(self.get_model(meshmodel_filepath), dim)
             self.info(meshmodel_filepath+"\n-->"+output_dir)
-            io.savemat(output_dir, {"instance":voxel_model}, appendmat=True, do_compression=True)
+            io.savemat(output_dir, {"instance":voxel_model, "info":self.get_modelInfo(info_filepath)}, appendmat=True, do_compression=True)
         
     def transform_saveVoxelFiles(self, cates="", source_filename = "model_normalized.obj", \
                              dest_filename="model_normalized.mat", dim=64, multiprocess=4, dest_samedir=True, dest_dir=""):
@@ -294,9 +296,15 @@ class DataIO(utils):
         return self.get_modelInfo_byModelNum(cate, self.model_dir[cate].index(model_name), filename)
         
 if __name__== "__main__":
-    test = DataIO(SHAPENET_MODEL_ROOTPATH, [] )
+    parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
+    parser.add_argument("-p", "--path", default=SHAPENET_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
+    parser.add_argument("-n", "--number", default=1, type=int, dest="processors_number", help="Define number of processors to do transform")
+    args = parser.parse_args()
+   
+    utils().info("Program start") 
+    test = DataIO(args.rootpath, [] )
     time1 = time.time()
-    test.transform_saveVoxelFiles("", dim=64, multiprocess=6, dest_samedir=False, dest_dir="./voxelModels")
+    test.transform_saveVoxelFiles("", dim=64, multiprocess=args.processors_number, dest_samedir=False, dest_dir="./voxelModels")
     time2 = time.time()
     print(time2-time1)
         
