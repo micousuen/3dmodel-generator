@@ -4,6 +4,7 @@ Created on Mar 5, 2018
 @author: micou
 '''
 import re
+import os
 import json
 import random
 import datetime
@@ -14,7 +15,7 @@ class utils:
     Some common tools to use. Like parsing sentences, write and read json file.
     """
     def _log_info_generator(self, logtype="Info"):
-        return datetime.datetime.now().isoformat(sep=" ")+" [{0:15}]{1:7}: ".format(threading.get_ident(), str(logtype))
+        return datetime.datetime.now().isoformat(sep=" ")+" [{0:<6}]{1:7}: ".format(os.getpid(), str(logtype))
     
     def info(self, details = "Information"):
         print(self._log_info_generator("Info"), details)

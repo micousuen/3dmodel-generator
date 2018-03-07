@@ -160,8 +160,10 @@ class DataIO(utils):
             self.info("Already Exist "+output_dir)
         else:
             voxel_model = self.transfrom_meshmodel2voxel(self.get_model(meshmodel_filepath), dim)
-            self.info(meshmodel_filepath+"\n-->"+output_dir)
-            io.savemat(output_dir, {"instance":voxel_model, "info":self.get_modelInfo(info_filepath)}, appendmat=True, do_compression=True)
+            modelinfo = self.get_modelInfo(info_filepath)
+            self.info("Vertices <"+str(modelinfo["numVertices"])+"> "+meshmodel_filepath+"\n-->"+output_dir)
+            
+            io.savemat(output_dir, {"instance":voxel_model, "info":modelinfo}, appendmat=True, do_compression=True)
         
     def transform_saveVoxelFiles(self, cates="", source_filename = "model_normalized.obj", \
                              dest_filename="model_normalized.mat", dim=64, multiprocess=4, dest_samedir=True, dest_dir=""):
@@ -192,7 +194,7 @@ class DataIO(utils):
             # Use only one thread to process mesh model to voxel model
             for c, path in enumerate(model_paths):
                 self.transform_saveVoxelFile(path, dim, dest_samedir, dest_filename, dest_dir)
-                print("Process: {0}/{1}".format(c, len(model_paths)))
+                self.info("Process: {0}/{1}".format(c, len(model_paths)))
     
     def get_voxmodel_generator(self, cates="", random=False):
         """
@@ -306,6 +308,6 @@ if __name__== "__main__":
     time1 = time.time()
     test.transform_saveVoxelFiles("", dim=64, multiprocess=args.processors_number, dest_samedir=False, dest_dir="./voxelModels")
     time2 = time.time()
-    print(time2-time1)
+    test.info(time2-time1)
         
         

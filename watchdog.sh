@@ -1,6 +1,7 @@
 #!/bin/bash
 
 PYTHON35_CONDA=/home/micou/.conda/envs/python35/bin/python3.5
+core_num=4
 
 while :
 do
@@ -11,7 +12,8 @@ do
 	else
 		echo "Restart program"
 		swapoff -a
-		$PYTHON35_CONDA dataIO.py -n 2 &
+		core_num=$(($core_num-1))
+		$PYTHON35_CONDA dataIO.py -n $core_num &
 		sleep 30
 	fi
 done
