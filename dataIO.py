@@ -22,7 +22,7 @@ except:
 
 
 from utils import Utils
-from setting import SHAPENET_MODEL_ROOTPATH
+from setting import SHAPENET_MODEL_ROOTPATH, VOXEL_MODEL_ROOTPATH
 
 class DataIO(Utils):
     rootpath = "./"
@@ -368,7 +368,7 @@ class DataIO(Utils):
         
         epoch_count = 0
         result_list = []
-        while epoch_count < epoch:
+        while epoch_count < epoch or epoch < 0:
             modelpool = generator()
             for modelAndInfo in modelpool:
                 if len(result_list) < batchNum:
@@ -376,6 +376,7 @@ class DataIO(Utils):
                 else:
                     yield result_list[:batchNum]
                     result_list = []
+                    result_list.append(modelAndInfo[0])
             epoch_count += 1
         if len(result_list) > 0:
             yield result_list

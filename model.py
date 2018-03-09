@@ -1,9 +1,9 @@
-import torch
+'''
+Created on Mar 5, 2018
+
+@author: micou
+'''
 import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms as T
-from torch.autograd import Variable
 
 from utils import Utils
 
@@ -22,6 +22,15 @@ class Generator(nn.Module):
         self.cube_len = args["cube_len"] if "cube_len" in args else 64
         self.latent_vector_size = args["latent_vector_size"] if "latent_vector_size" in args else 200
         self.bias_flag = args["bias_flag"] if "bias_flag" in args else True
+        self.args = {
+                "cube_len":self.cube_len, 
+                "latent_vector_size":self.latent_vector_size, 
+                "bias_flag":self.bias_flag
+            }
+        # Display settings 
+        for key in self.args:
+            Utils().info("<Generator> Set ", key, " to ", self.args[key])
+        
         firstLayer_padding = (0, 0, 0) if self.cube_len == 64 else (1, 1, 1)
         
         if self.cube_len not in {32, 64}:
@@ -82,32 +91,44 @@ class Discriminator(nn.Module):
             latent_vector_size: int, default 200
             bias_flag: bool, default True
         """
+        super(Discriminator, self).__init__()
+        
         self.cube_len = args["cube_len"] if "cube_len" in args else 64
         self.latent_vector_size = args["latent_vector_size"] if "latent_vector_size" in args else 200
         self.bias_flag = args["bias_flag"] if "bias_flag" in args else True
+        self.leakyrelu_value = args["leakyrelu_value"] if "leakyrelu_value" in args else 0.2
+        self.args = {
+                "cube_len":self.cube_len, 
+                "latent_vector_size":self.latent_vector_size, 
+                "bias_flag":self.bias_flag,
+                "leakyrelu_value":self.leakyrelu_value
+            }
+        # Display settings 
+        for key in self.args:
+            Utils().info("<Discriminator> Set ", key, " to ", self.args[key])
         
         self.layer1_conv = nn.Sequential(
                 nn.Conv3d(1, self.cube_len, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len), 
-                nn.LeakyReLU()
+                nn.LeakyReLU(self.leakyrelu_value)
             )
         
         self.layer2_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len, self.cube_len*2, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*2), 
-                nn.LeakyReLU()
+                nn.LeakyReLU(self.leakyrelu_value)
             )
         
         self.layer3_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len*2, self.cube_len*4, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*4), 
-                nn.LeakyReLU()
+                nn.LeakyReLU(self.leakyrelu_value)
             )
         
         self.layer4_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len*4, self.cube_len*8, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*8), 
-                nn.LeakyReLU()
+                nn.LeakyReLU(self.leakyrelu_value)
             )
         
         self.layer5 = nn.Sequential(
