@@ -8,14 +8,13 @@ import os
 import json
 import random
 import datetime
-import threading
 
-class utils:
+class Utils:
     """
     Some common tools to use. Like parsing sentences, write and read json file.
     """
     def _log_info_generator(self, logtype="Info"):
-        return datetime.datetime.now().isoformat(sep=" ")+" [{0:<6}]{1:7}: ".format(os.getpid(), str(logtype))
+        return datetime.datetime.now().isoformat(sep=" ")+" [{0:<4}] {1:7}: ".format(os.getpid(), str(logtype))
     
     def info(self, details = "Information"):
         print(self._log_info_generator("Info"), details)
@@ -129,7 +128,7 @@ class utils:
                             }
     
 if __name__ == "__main__":
-    test = utils()
+    test = Utils()
     test.info("test")
     test.warn("test")
     test.error("test")

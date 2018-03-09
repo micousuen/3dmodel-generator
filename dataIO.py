@@ -4,14 +4,10 @@ Created on Mar 5, 2018
 @author: micou
 '''
 import os
-import time
-import pprint
 import argparse
 import numpy as np
 import scipy.io as io
-import scipy.ndimage as nd
 from functools import reduce
-
 try:
     from pathos.multiprocessing import ProcessingPool as Pool
 except:
@@ -24,11 +20,11 @@ except:
     print("Fatal: Require trimesh package, check https://pypi.python.org/pypi/trimesh")
     exit()
 
-from view import view
-from utils import utils
+
+from utils import Utils
 from setting import SHAPENET_MODEL_ROOTPATH
 
-class DataIO(utils):
+class DataIO(Utils):
     rootpath = "./"
     cate_dir = []
     cate_info = {} # {<category>:{informations}}
@@ -41,6 +37,9 @@ class DataIO(utils):
     total_modelnum = 0
     
     def __init__(self, rootpath=rootpath, certain_cate=[]):
+        """
+        Strongly recommend to check rootpath before running. Otherwise you will get bunch of warnings
+        """
         self.rootpath = os.path.abspath(rootpath)
         self._check_validation()
         self._read_model_dir(certain_cate)
@@ -159,10 +158,9 @@ class DataIO(utils):
         if os.path.isfile(output_dir):
             self.info("Already Exist "+output_dir)
         else:
-            voxel_model = self.transfrom_meshmodel2voxel(self.get_model(meshmodel_filepath), dim)
             modelinfo = self.get_modelInfo(info_filepath)
             self.info("Vertices <"+str(modelinfo["numVertices"])+"> "+meshmodel_filepath+"\n-->"+output_dir)
-            
+            voxel_model = self.transfrom_meshmodel2voxel(self.get_model(meshmodel_filepath), dim)
             io.savemat(output_dir, {"instance":voxel_model, "info":modelinfo}, appendmat=True, do_compression=True)
         
     def transform_saveVoxelFiles(self, cates="", source_filename = "model_normalized.obj", \
@@ -190,59 +188,29 @@ class DataIO(utils):
             # If package not given, will not be able to use this multiprocessing
             ProcessPool = Pool(multiprocess)
             ProcessPool.map(lambda x: self.transform_saveVoxelFile(x, dim, dest_samedir, dest_filename, dest_dir), model_paths)
+            ProcessPool.close()
+            ProcessPool.join()
+            ProcessPool.terminate()
         else:
             # Use only one thread to process mesh model to voxel model
-            for c, path in enumerate(model_paths):
+            for c, path in enumerate(self.random_permutation(model_paths)):
                 self.transform_saveVoxelFile(path, dim, dest_samedir, dest_filename, dest_dir)
                 self.info("Process: {0}/{1}".format(c, len(model_paths)))
     
-    def get_voxmodel_generator(self, cates="", random=False):
-        """
-        return a generator which will return (voxel model, {}) with model info missing
-        if random, then randomly select model, but everyone will be selected in the end
-        if cates not given, return all models we have. To input multi category, use space to seperate them
-        """
-        # Generate category list to iterate
-        cate_list = self.get_cateListFromCates(cates)
-        if cate_list == []:
-            raise StopIteration
-        
-        if random:
-            # Randomly permute category, and randomly permute every model
-            for ca in self.random_permutation(cate_list):
-                for mo in self.random_permutation(self.model_dir[ca]):
-                    yield (self.get_model_byModelName(ca, mo),{} )
+    def get_model_abspath(self, model_dir_info, filename):
+        if isinstance(model_dir_info, tuple):
+            (cate, model_num)=model_dir_info
+            if self.model_dir[cate][model_num].endswith(".mat") or self.model_dir[cate][model_num].endswith(".json"):
+                return self.model_dir[cate][model_num]
+            else:
+                return os.path.join(self.model_dir[cate][model_num], filename)
+        elif isinstance(model_dir_info, str):
+            if model_dir_info.endswith(".mat") or model_dir_info.endswith(".json"):
+                return model_dir_info
+            else:
+                return os.path.join(model_dir_info, filename)
         else:
-            for ca in cate_list:
-                for n in range(self.get_numOfModels(ca)):
-                    yield (self.get_model_byModelNum(ca, n),{} )
-    
-    def get_meshmodel_generator(self, cates="", random=False, obj_filename=default_model_filename, info_filename=default_modelInfo_filename):
-        """
-        return a generator which will return (mesh model, model info)
-        if random, then randomly select model, but everyone will be selected in the end
-        if cates not given, return all models we have. To input multi category, use space to seperate them
-        """
-        # Generate category list to iterate
-        cate_list = self.get_cateListFromCates(cates)
-        if cate_list == []:
-            raise StopIteration
-        
-        if random:
-            # Randomly permute category, and randomly permute every model
-            for ca in self.random_permutation(cate_list):
-                for mo in self.random_permutation(self.model_dir[ca]):
-                    yield (self.get_model_byModelName(ca, mo, obj_filename),self.get_modelInfo_byModelName(ca, mo))
-        else:
-            for ca in cate_list:
-                for n in range(self.get_numOfModels(ca)):
-                    yield (self.get_model_byModelNum(ca, n, info_filename),self.get_modelInfo_byModelNum(ca, n))
-    
-    def get_model_abspath(self, cate, model_num, filename):
-        if self.model_dir[cate][model_num].endswith(".mat"):
-            return self.model_dir[cate][model_num]
-        else:
-            return os.path.join(self.model_dir[cate][model_num], filename)
+            self.error("Error model_dir_info")
     
     def get_model(self, filepath):
         """
@@ -274,40 +242,133 @@ class DataIO(utils):
     def get_model_byModelNum(self, cate, model_num, filename=default_model_filename):
         """
         return mesh model
+        filename only valid when target model_dir is not endswith .mat
         """
-        filepath = os.path.join(self.get_model_abspath(cate, model_num, filename))
+        filepath = os.path.join(self.get_model_abspath((cate, model_num), filename))
         return self.get_model(filepath)
     
     def get_modelInfo_byModelNum(self, cate, model_num, filename=default_modelInfo_filename):
         """
         return model information
+        filename only valid when target model_dir is not endswith .mat
         """
-        filepath = os.path.join(self.get_model_abspath(cate, model_num, filename))
+        filepath = os.path.join(self.get_model_abspath((cate, model_num), filename))
         return self.get_modelInfo(filepath)
     
     def get_model_byModelName(self, cate, model_name, filename=default_model_filename):
         """
         return mesh model, alias of get_model
+        filename only valid when target model_dir is not endswith .mat
         """
         return  self.get_model_byModelNum(cate, self.model_dir[cate].index(model_name), filename)
     
     def get_modelInfo_byModelName(self, cate, model_name, filename=default_modelInfo_filename):
         """
         return model information, alias of get_model
+        filename only valid when target model_dir is not endswith .mat
         """
         return self.get_modelInfo_byModelNum(cate, self.model_dir[cate].index(model_name), filename)
+    
+    def get_voxmodel_generator(self, cates="", random=False):
+        """
+        return a generator which will return (voxel model, {}) with model info missing
+        if random, then randomly select model, but everyone will be selected in the end
+        if cates not given, return all models we have. To input multi category, use space to seperate them
+        """
+        # Generate category list to iterate
+        cate_list = self.get_cateListFromCates(cates)
+        if cate_list == []:
+            raise StopIteration
+        
+        if random:
+            # Randomly permute category, and randomly permute every model
+            model_list = self.get_flattenAbsModelDir(cates)
+            for md in self.random_permutation(model_list):
+                if not md.endswith(".mat"):
+                    self.warn("voxel model error at path: "+md)
+                else:
+                    yield (self.get_model(md), {"filepath":md})
+        else:
+            model_list = self.get_flattenAbsModelDir(cates)
+            for md in model_list:
+                if not md.endswith(".mat"):
+                    self.warn("voxel model error at path: "+md)
+                else:
+                    yield (self.get_model(md),{"filepath":md} )
+    
+    def get_meshmodel_generator(self, cates="", random=False, obj_filename=default_model_filename, info_filename=default_modelInfo_filename):
+        """
+        return a generator which will return (mesh model, model info)
+        if random, then randomly select model, but everyone will be selected in the end
+        if cates not given, return all models we have. To input multi category, use space to seperate them
+        
+        """
+        # Generate category list to iterate
+        cate_list = self.get_cateListFromCates(cates)
+        if cate_list == []:
+            raise StopIteration
+        
+        if random:
+            # Randomly permute category, and randomly permute every model
+            model_list = self.get_flattenAbsModelDir(cates)
+            for md in self.random_permutation(model_list):
+                if md.endswith(".mat") or md.endswith(".json"):
+                    self.warn("mesh model path error: "+md)
+                else:
+                    yield (self.get_model(self.get_model_abspath(md, obj_filename)), self.get_modelInfo(self.get_model_abspath(md, info_filename)))
+        else:
+            model_list = self.get_flattenAbsModelDir(cates)
+            for md in model_list:
+                if md.endswith(".mat") or md.endswith(".json"):
+                    self.warn("mesh model dir error: "+md)
+                else:
+                    yield (self.get_model(self.get_model_abspath(md, obj_filename)), self.get_modelInfo(self.get_model_abspath(md, info_filename)))
+                    
+    def get_batchmodels(self, cates="", batchNum=100, epoch=100, random=False, modelType="voxel", obj_filename=default_model_filename, info_filename=default_modelInfo_filename):
+        """
+        return a batch of models (with no info). Use get_voxelmodel_generator and get_meshmodel_generator to get model
+        Go through whole data set at most <epoch> times
+        modelType is string in {"voxel","mesh"}
+        obj_filename and info_filename are optional, only valid when modelType is 'mesh'
+        """
+        if modelType == "voxel":
+            generator = lambda : self.get_voxmodel_generator(cates, random)
+        elif modelType == "mesh":
+            generator = lambda : self.get_meshmodel_generator(cates, random, obj_filename, info_filename)
+        else:
+            self.error("Unknown modelType in get_batchmodels")
+            return
+        
+        epoch_count = 0
+        result_list = []
+        while epoch_count < epoch:
+            modelpool = generator()
+            for modelAndInfo in modelpool:
+                if len(result_list) < batchNum:
+                    result_list.append(modelAndInfo[0])
+                else:
+                    yield result_list[:batchNum]
+                    result_list = []
+            epoch_count += 1
+        if len(result_list) > 0:
+            yield result_list
+        
         
 if __name__== "__main__":
+#     SHAPENET_MODEL_ROOTPATH = "./test_folder"
+#     SHAPENET_MODEL_ROOTPATH = "./test_mat"
     parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
     parser.add_argument("-p", "--path", default=SHAPENET_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
     parser.add_argument("-n", "--number", default=1, type=int, dest="processors_number", help="Define number of processors to do transform")
     args = parser.parse_args()
-   
-    utils().info("Program start") 
+    
+    Utils().info("Program start")
     test = DataIO(args.rootpath, [] )
-    time1 = time.time()
+    
+#     for m in test.get_batchmodels("", 100, 5, True, "voxel"):
+#         print(len(m))
+        
     test.transform_saveVoxelFiles("", dim=64, multiprocess=args.processors_number, dest_samedir=False, dest_dir="./voxelModels")
-    time2 = time.time()
-    test.info(time2-time1)
+
         
         
