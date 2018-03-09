@@ -25,6 +25,13 @@ class View(Utils):
         """
         savefile_dest only required when blocking is False
         """
+        if not blocking:
+            if os.path.isfile(savefile_dest):
+                self.warn("Destination file exist, will skip it.")
+                return
+            elif os.path.isdir(savefile_dest):
+                self.warn("Destination is a directory, no filename given")
+                return
         
         # Reference: https://matplotlib.org/gallery/mplot3d/voxels_rgb.html
         # Prepare color for it
@@ -54,12 +61,7 @@ class View(Utils):
         if blocking:
             plt.show()
         else:
-            if os.path.isfile(savefile_dest):
-                self.warn("Destination file exist, will skip it.")
-            elif os.path.isdir(savefile_dest):
-                self.warn("Destination is a directory, no filename given")
-            else:
-                fig.savefig(savefile_dest, dpi=100)
+            fig.savefig(savefile_dest, dpi=100)
         
         plt.close(fig)
 

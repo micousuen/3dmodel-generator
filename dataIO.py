@@ -51,6 +51,7 @@ class DataIO(Utils):
     
     def _read_model_dir(self, certain_cate=[], saved_model_dirfile="./model_dir.json"):
         def _build_model_dir(certain_cate):
+            self.info("Try to build model_dir and cate_dir")
             self.cate_dir = [os.path.join(self.rootpath, n) \
                              for n in os.listdir(self.rootpath) \
                              if os.path.isdir(os.path.join(self.rootpath, n)) and (n in certain_cate or certain_cate==[] ) ]
@@ -70,10 +71,12 @@ class DataIO(Utils):
                 
         if os.path.isfile(saved_model_dirfile):
             try:
+                self.info("Try to load from local model_dir file")
                 store_info = self.read_from_json(saved_model_dirfile)
                 self.cate_dir = store_info["cate_dir"]
                 self.model_dir = store_info["model_dir"]
             except:
+                self.warn("Failed to load from model_dir file")
                 _build_model_dir(certain_cate)
                 self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
         else:
