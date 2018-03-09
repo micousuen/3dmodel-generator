@@ -36,13 +36,21 @@ class DataIO(Utils):
     processed = 0
     total_modelnum = 0
     
-    def __init__(self, rootpath=rootpath, certain_cate=[]):
+    def __init__(self, rootpath=rootpath, certain_cate=[], model_dir_file="./model_dir.json"):
         """
         Strongly recommend to check rootpath before running. Otherwise you will get bunch of warnings
         """
         self.rootpath = os.path.abspath(rootpath)
         self._check_validation()
-        self._read_model_dir(certain_cate)
+        if os.path.isfile(model_dir_file):
+            try:
+                self.model_dir = self.read_from_json(model_dir_file)
+            except:
+                self._read_model_dir(certain_cate)
+                self.write_to_json(self.model_dir, model_dir_file)
+        else:
+            self._read_model_dir(certain_cate)
+            self.write_to_json(self.model_dir, model_dir_file)
         #pprint.pprint(self.model_dir)
         
     def _check_validation(self):
@@ -360,10 +368,11 @@ if __name__== "__main__":
     parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
     parser.add_argument("-p", "--path", default=SHAPENET_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
     parser.add_argument("-n", "--number", default=1, type=int, dest="processors_number", help="Define number of processors to do transform")
+    parser.add_argument("-m", "--modeltree", default="", dest="model_dir_filename", help="json file that saved model directory, if not exist, create one after model tree building")
     args = parser.parse_args()
     
     Utils().info("Program start")
-    test = DataIO(args.rootpath, [] )
+    test = DataIO(args.rootpath, [], args.model_dir_filename )
     
 #     for m in test.get_batchmodels("", 100, 5, True, "voxel"):
 #         print(len(m))
