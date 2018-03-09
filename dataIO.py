@@ -368,7 +368,7 @@ if __name__== "__main__":
     parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
     parser.add_argument("-p", "--path", default=SHAPENET_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
     parser.add_argument("-n", "--number", default=1, type=int, dest="processors_number", help="Define number of processors to do transform")
-    parser.add_argument("-m", "--modeltree", default="", dest="model_dir_filename", help="json file that saved model directory, if not exist, create one after model tree building")
+    parser.add_argument("-m", "--modeltree", default="./model_dir.json", dest="model_dir_filename", help="json file that saved model directory, if not exist, create one after model tree building")
     args = parser.parse_args()
     
     Utils().info("Program start")
