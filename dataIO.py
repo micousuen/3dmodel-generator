@@ -36,44 +36,49 @@ class DataIO(Utils):
     processed = 0
     total_modelnum = 0
     
-    def __init__(self, rootpath=rootpath, certain_cate=[], model_dir_file="./model_dir.json"):
+    def __init__(self, rootpath=rootpath, certain_cate=[], saved_model_dirfile="./model_dir.json"):
         """
         Strongly recommend to check rootpath before running. Otherwise you will get bunch of warnings
         """
         self.rootpath = os.path.abspath(rootpath)
         self._check_validation()
-        if os.path.isfile(model_dir_file):
-            try:
-                self.model_dir = self.read_from_json(model_dir_file)
-            except:
-                self._read_model_dir(certain_cate)
-                self.write_to_json(self.model_dir, model_dir_file)
-        else:
-            self._read_model_dir(certain_cate)
-            self.write_to_json(self.model_dir, model_dir_file)
+        self._read_model_dir(certain_cate, saved_model_dirfile)
         #pprint.pprint(self.model_dir)
         
     def _check_validation(self):
         if not os.path.isdir(self.rootpath):
             self.error("Root path do not exist")
     
-    def _read_model_dir(self, certain_cate=[]):
-        self.cate_dir = [os.path.join(self.rootpath, n) \
-                         for n in os.listdir(self.rootpath) \
-                         if os.path.isdir(os.path.join(self.rootpath, n)) and (n in certain_cate or certain_cate==[] ) ]
-        for cate in self.cate_dir:
-            # if there are model folder under each model directory, that means this shapeNet raw database.
-            # Otherwise this is generated mat database
-            paths = os.listdir(cate)
-            temp_model = []
-            for p in paths:
-                if os.path.isdir(os.path.join(cate, p, "models")):
-                    # If mesh model
-                    temp_model.append(os.path.join(cate, p, "models"))
-                elif p.endswith(".mat"):
-                    # If already mat file
-                    temp_model.append(os.path.join(cate, p))
-            self.model_dir[cate] = sorted(temp_model)
+    def _read_model_dir(self, certain_cate=[], saved_model_dirfile="./model_dir.json"):
+        def _build_model_dir(certain_cate):
+            self.cate_dir = [os.path.join(self.rootpath, n) \
+                             for n in os.listdir(self.rootpath) \
+                             if os.path.isdir(os.path.join(self.rootpath, n)) and (n in certain_cate or certain_cate==[] ) ]
+            for cate in self.cate_dir:
+                # if there are model folder under each model directory, that means this shapeNet raw database.
+                # Otherwise this is generated mat database
+                paths = os.listdir(cate)
+                temp_model = []
+                for p in paths:
+                    if os.path.isdir(os.path.join(cate, p, "models")):
+                        # If mesh model
+                        temp_model.append(os.path.join(cate, p, "models"))
+                    elif p.endswith(".mat"):
+                        # If already mat file
+                        temp_model.append(os.path.join(cate, p))
+                self.model_dir[cate] = sorted(temp_model)
+                
+        if os.path.isfile(saved_model_dirfile):
+            try:
+                store_info = self.read_from_json(saved_model_dirfile)
+                self.cate_dir = store_info["cate_dir"]
+                self.model_dir = store_info["model_dir"]
+            except:
+                _build_model_dir(certain_cate)
+                self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
+        else:
+            _build_model_dir(certain_cate)
+            self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
             
     def get_cate(self):
         """
