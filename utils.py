@@ -16,14 +16,14 @@ class Utils:
     def _log_info_generator(self, logtype="Info"):
         return datetime.datetime.now().isoformat(sep=" ")+" [{0:<4}] {1:7}: ".format(os.getpid(), str(logtype))
     
-    def info(self, details = "Information"):
-        print(self._log_info_generator("Info"), details)
+    def info(self, *details):
+        print(self._log_info_generator("Info"), "".join([str(n) for n in details]))
         
-    def warn(self, details = "Warning"):
-        print(self._log_info_generator("Warning"), details)
+    def warn(self, *details):
+        print(self._log_info_generator("Warning"), "".join([str(n) for n in details]))
 
-    def error(self, details = "Error will cause Exit of program"):
-        print(self._log_info_generator("Error"), details)
+    def error(self, *details):
+        print(self._log_info_generator("Error"), "".join([str(n) for n in details]))
         exit(1)
         
     def random_permutation(self, input_list):

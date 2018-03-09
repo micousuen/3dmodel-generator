@@ -17,8 +17,10 @@ from setting import VOXEL_MODEL_ROOTPATH
 class View(Utils):
     def save_voxelImage(self, input_args):
         """
+        if this function called, pyplot will use backend mode to run
         input_args should have (model, dest_filepath)
         """
+        plt.switch_backend('agg')
         self.visual_voxel(input_args[0], False, input_args[1])
     
     def visual_voxel(self, voxel_ndarray, blocking=True, savefile_dest="./temp.png"):
@@ -66,7 +68,6 @@ class View(Utils):
         plt.close(fig)
 
 if __name__ == "__main__":
-    VOXEL_MODEL_ROOTPATH = "./test_mat"
     parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
     parser.add_argument("-p", "--path", default=VOXEL_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
     parser.add_argument("-n", "--number", default=8, type=int, dest="processors_number", help="Define number of processors to do transform")
@@ -77,19 +78,21 @@ if __name__ == "__main__":
     multi_pool = Pool(args.processors_number)
     temp_list = []
     view_obj = View()
+    done = 0
     for model in model_generator:
         if len(temp_list) < args.processors_number * 20:
             model_dir, model_file = os.path.split(model[1]["filepath"])
             model_file_prefix, _ = os.path.splitext(model_file)
             temp_list.append((model[0], os.path.join(model_dir, model_file_prefix+".png")))
         else:
-            print("Processing one list")
+            Utils().info("Processing one list, already done: ", done)
             multi_pool.map(view_obj.save_voxelImage, temp_list) #View().visual_voxel(x[0],False, x[1])
+            done += len(temp_list)
             temp_list = []
             multi_pool.close()
             multi_pool.terminate()
             multi_pool = Pool(args.processors_number)
-    print("Exist main loop, left: ", len(temp_list))
+    Utils().info("Exist main loop, left: ",str(len(temp_list)))
     if len(temp_list) > 0:
         multi_pool.map(view_obj.save_voxelImage, temp_list)
     

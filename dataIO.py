@@ -36,7 +36,7 @@ class DataIO(Utils):
     processed = 0
     total_modelnum = 0
     
-    def __init__(self, rootpath=rootpath, certain_cate=[], saved_model_dirfile="./model_dir.json"):
+    def __init__(self, rootpath=rootpath, certain_cate=[], saved_model_dirfile=""):
         """
         Strongly recommend to check rootpath before running. Otherwise you will get bunch of warnings
         """
@@ -49,7 +49,10 @@ class DataIO(Utils):
         if not os.path.isdir(self.rootpath):
             self.error("Root path do not exist")
     
-    def _read_model_dir(self, certain_cate=[], saved_model_dirfile="./model_dir.json"):
+    def _read_model_dir(self, certain_cate=[], saved_model_dirfile=""):
+        """
+        if saved_model_dirfile not given, don't save or read from local model_dir json file
+        """
         def _build_model_dir(certain_cate):
             self.info("Try to build model_dir and cate_dir")
             self.cate_dir = [os.path.join(self.rootpath, n) \
@@ -69,7 +72,9 @@ class DataIO(Utils):
                         temp_model.append(os.path.join(cate, p))
                 self.model_dir[cate] = sorted(temp_model)
                 
-        if os.path.isfile(saved_model_dirfile):
+        if saved_model_dirfile == "":
+            _build_model_dir(certain_cate)
+        elif os.path.isfile(saved_model_dirfile):
             try:
                 self.info("Try to load from local model_dir file")
                 store_info = self.read_from_json(saved_model_dirfile)
@@ -78,10 +83,16 @@ class DataIO(Utils):
             except:
                 self.warn("Failed to load from model_dir file")
                 _build_model_dir(certain_cate)
-                self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
+                try:
+                    self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
+                except:
+                    self.warn("Incorrect saved_model_dirfile, cannot save model_dir data")
         else:
             _build_model_dir(certain_cate)
-            self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
+            try:
+                self.write_to_json({"cate_dir":self.cate_dir, "model_dir":self.model_dir}, saved_model_dirfile)
+            except:
+                self.warn("Incorrect saved_model_dirfile, cannot save model_dir data")
             
     def get_cate(self):
         """
@@ -211,7 +222,7 @@ class DataIO(Utils):
             # Use only one thread to process mesh model to voxel model
             for c, path in enumerate(self.random_permutation(model_paths)):
                 self.transform_saveVoxelFile(path, dim, dest_samedir, dest_filename, dest_dir)
-                self.info("Process: {0}/{1}".format(c, len(model_paths)))
+                self.info("Process: {0}/{1}".format(c+1, len(model_paths)))
     
     def get_model_abspath(self, model_dir_info, filename):
         if isinstance(model_dir_info, tuple):
