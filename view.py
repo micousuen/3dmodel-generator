@@ -79,6 +79,7 @@ if __name__ == "__main__":
     temp_list = []
     view_obj = View()
     done = 0
+    # Start to read data from model_generator. Each processor will process about 20 images per round
     for model in model_generator:
         if len(temp_list) < args.processors_number * 20:
             model_dir, model_file = os.path.split(model[1]["filepath"])

@@ -67,17 +67,17 @@ class Generator(nn.Module):
         
     def forward(self, latent_vector):
         out = latent_vector.view(-1, self.latent_vector_size, 1, 1, 1)
-        print(out.size())
+#         print(out.size())
         out = self.layer1_deconv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer2_deconv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer3_deconv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer4_deconv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer5(out)
-        print(out.size())
+#         print(out.size())
         
         return out
 
@@ -103,6 +103,9 @@ class Discriminator(nn.Module):
                 "bias_flag":self.bias_flag,
                 "leakyrelu_value":self.leakyrelu_value
             }
+        
+        lastLayer_padding = (0, 0, 0) if self.cube_len == 64 else (1, 1, 1)
+        
         # Display settings 
         for key in self.args:
             Utils().info("<Discriminator> Set ", key, " to ", self.args[key])
@@ -132,23 +135,23 @@ class Discriminator(nn.Module):
             )
         
         self.layer5 = nn.Sequential(
-                nn.Conv3d(self.cube_len*8, 1, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
+                nn.Conv3d(self.cube_len*8, 1, kernel_size=4, stride=2, bias=self.bias_flag, padding=lastLayer_padding), 
                 nn.Sigmoid()
             )
         
     def forward(self, input_model):
         out = input_model.view(-1, 1, self.cube_len, self.cube_len, self.cube_len)
-        print(out.size())
+#         print(out.size())
         out = self.layer1_conv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer2_conv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer3_conv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer4_conv(out)
-        print(out.size())
+#         print(out.size())
         out = self.layer5(out)
-        print(out.size())
+#         print(out.size())
         
         return out
 

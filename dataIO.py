@@ -368,23 +368,24 @@ class DataIO(Utils):
         
         epoch_count = 0
         result_list = []
+        epoch_end_flag = 0
         while epoch_count < epoch or epoch < 0:
             modelpool = generator()
             for modelAndInfo in modelpool:
                 if len(result_list) < batchNum:
                     result_list.append(modelAndInfo[0])
                 else:
-                    yield result_list[:batchNum]
+                    yield (result_list[:batchNum], epoch_end_flag)
+                    epoch_end_flag = 0
                     result_list = []
                     result_list.append(modelAndInfo[0])
             epoch_count += 1
+            epoch_end_flag += 1
         if len(result_list) > 0:
-            yield result_list
+            yield (result_list, epoch_end_flag)
         
         
 if __name__== "__main__":
-#     SHAPENET_MODEL_ROOTPATH = "./test_folder"
-#     SHAPENET_MODEL_ROOTPATH = "./test_mat"
     parser = argparse.ArgumentParser(description="dataIO module to tranform mesh model to voxel model")
     parser.add_argument("-p", "--path", default=SHAPENET_MODEL_ROOTPATH, dest="rootpath", help="Root path to unzipped shapeNet folder")
     parser.add_argument("-n", "--number", default=1, type=int, dest="processors_number", help="Define number of processors to do transform")
@@ -395,7 +396,7 @@ if __name__== "__main__":
     test = DataIO(args.rootpath, [], args.model_dir_filename )
     
 #     for m in test.get_batchmodels("", 100, 5, True, "voxel"):
-#         print(len(m))
+#         print(len(m[0]))
         
     test.transform_saveVoxelFiles("", dim=64, multiprocess=args.processors_number, dest_samedir=False, dest_dir="./voxelModels")
 
