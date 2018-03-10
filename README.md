@@ -10,6 +10,18 @@
 2. trimesh: to read model and transform it, get from "pip install trimesh"
 
 ## ChangeLog
-20180306
-1. Finished dataIO module, can read and write model, can transform mesh model to voxel model and save them. Can randomly yield models. 
+20180310
+* Fix some training problems. 
+
+20180309
+* Finished training procesure. First runable model
+
+20180308
+* Finished model construction. 
+
+20180307
+* Finished view module. Can use mat files to generate model images
+
+20180306 
+* Finished dataIO module, can read and write model, can transform mesh model to voxel model and save them. Can randomly yield models. 
 
