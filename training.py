@@ -33,6 +33,7 @@ class Train(Utils):
     data_send, data_recv = Pipe()
     data_process = None
     epoch = 0
+    iteration = 0
     
     def __init__(self, args={}):
         """
@@ -106,12 +107,12 @@ class Train(Utils):
         
     
     def train(self):
+        saved_iteration = self.iteration
         saved_epoch = self.epoch
-        iteration = 0
         # If meet the epoch limit, our data_generator will automatically exit
         for batch in self.data_generator:
             self.epoch += batch[1] # if finished one epoch, flag at this position will be 1 (or greater if more than 1 epoch in one batch), otherwise this flag will be 0
-            iteration += 1
+            self.iteration += 1
             realModels = batch[0] # A tensor on cpu or gpu, based one data type
             
             # Drop incompatible batch
@@ -126,14 +127,43 @@ class Train(Utils):
             
             # Prepare label factors, used for soft_label
             if self.args["soft_label"]:
-                realLabelFactor = Tensor(self.args["batch_size"]).uniform_(0.7, 1)
+                realLabelFactor = Tensor(self.args["batch_size"]).uniform_(0.7, 1.2)
                 fakeLabelFactor = Tensor(self.args["batch_size"]).uniform_(0, 0.3)
             else:
                 realLabelFactor = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.ones(self.args["batch_size"])
                 fakeLabelFactor = torch.zeros(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.zeros(self.args["batch_size"]).cuda()
             
-            def train_discriminator():
-                #************* Train Discriminator ***********
+            def train_discriminator_vanilla():
+                #************* Train Discriminator ************
+                latent_vectors = self._get_latentVectors(self.args)
+                realDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.ones(self.args["batch_size"])
+                fakeDataLabel = torch.zeros(self.args["batch_size"]).cuda() if torch.cuda.is_available()  else torhc.zeros(self.args["batch_size"])
+                
+                d_eval_real = self.discriminator(self.transform_var(realModels)).squeeze()
+                d_real_loss = self.loss_function(d_eval_real, self.transform_var(realDataLabel * realLabelFactor))
+                
+                fakeModels = self.generator(latent_vectors)
+                d_eval_fake = self.discriminator(self.transform_var(fakeModels)).squeeze()
+                d_fake_loss = self.loss_function(d_eval_fake, self.transform_var(fakeDataLabel * fakeLabelFactor))
+                
+                d_loss = d_real_loss + d_fake_loss
+                d_real_accuracy = d_eval_real.data.ge(0.5).float()
+                d_fake_accuracy = d_eval_fake.data.lt(0.5).float()
+                d_accuracy = torch.mean(torch.cat((d_real_accuracy , d_fake_accuracy)), 0)
+                
+                if torch.is_tensor(d_accuracy):
+                    d_accuracy = d_accuracy[0]
+                
+                if d_accuracy <= self.args["discriminator_training_threshold"]:
+                    self.generator.zero_grad()
+                    self.discriminator.zero_grad()
+                    d_loss.backward()
+                    self.discriminator_optim.step()
+                
+                return (d_accuracy, d_real_loss.data[0], d_fake_loss.data[0])
+            
+            def train_discriminator_mixup():
+                #************* Train Discriminator use mixed up models ***********
                 latent_vectors = self._get_latentVectors(self.args)
                 # Generate random 1d data mask for real & fake data
                 realDataLabel = torch.rand(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.rand(self.args["batch_size"])
@@ -164,11 +194,12 @@ class Train(Utils):
             def train_generator():
                 #************* Train Generator ************
                 latent_vectors = self._get_latentVectors(self.args)
+                
                 # Generate fake models from geneator
                 fakeModels = self.generator(latent_vectors)
                 fakeModelEvaluation = self.discriminator(fakeModels).squeeze()
                 # Wrap label with variable so it can cal gradient
-                realLabel = self.transform_var(torch.ones(self.args["batch_size"]).type(Tensor) * realLabelFactor)
+                realLabel = self.transform_var(torch.ones(self.args["batch_size"]) * realLabelFactor)
                 generator_loss = self.loss_function(fakeModelEvaluation, realLabel)
                 
                 g_confuse_rate = torch.mean(fakeModelEvaluation.data.ge(0.5).float())
@@ -181,21 +212,26 @@ class Train(Utils):
             
             # Based on g_d_training_rate, train our model
             if self.args["g_d_training_rate"] >= 1:
-                d_info = train_discriminator()
+                d_info = train_discriminator_vanilla()
                 for _ in range(int(self.args["g_d_training_rate"])):
                     g_info = train_generator()
             else:
                 g_info = train_generator()
                 for _ in range(int(1/self.args["g_d_training_rate"])):
-                    d_info = train_discriminator()
+                    d_info = train_discriminator_vanilla()
             
-            self.info("discriminator: total accuracy <{0}>, real model loss <{1}>, fake model loss <{2}>".format(*d_info))
-            self.info("generator: confused discriminator rate <{0}>, generator loss <{1}>".format(*g_info))
+            self.info("E {0} I {1} -->".format(self.epoch, self.iteration), "D: accuracy <{0}>, real loss <{1}>, fake loss <{2}>".format(*d_info)," G: confused rate <{0}>, generator loss <{1}>".format(*g_info))
             
             if self.epoch - saved_epoch > self.args["save_model_interval"]:
                 self._save_status(self.args["checkpoint_filename"])
                 self.info("Checkpoint filesaved at", self.args["checkpoint_filename"])
                 saved_epoch = self.epoch
+                self.iteration = 0 
+                saved_iteration = 0
+            if self.iteration - saved_iteration > self.args["save_model_interval"] * 100:
+                self._save_status(self.args["checkpoint_filename"])
+                self.info("Checkpoint filesaved at", self.args["checkpoint_filename"])
+                saved_iteration = self.iteration
             
             
     def _get_fullMask(self, oneDimMask, tensorToMask):
@@ -253,6 +289,9 @@ class Train(Utils):
         obj must be a tensor. If not program will raise exception
         Wrap tensor with Variable, based on obj tensor type
         """
+        if isinstance(obj, Variable):
+            # If Variable given, directly return it in case this function is called twice
+            return obj
         if not torch.is_tensor(obj):
             self.error("obj given to transform_var is not a tensor")
         if torch.cuda.is_available() and not obj.is_cuda:
@@ -340,6 +379,6 @@ class Train(Utils):
         super(Train, self).error(*args)
     
 if __name__ == "__main__":
-        a = Train({"epoch_limit":-1, "batch_size":50, "cube_len":64, "data_rootpath":"./voxelModels", "soft_label":True})
+        a = Train({"epoch_limit":-1, "batch_size":50, "cube_len":64, "data_rootpath":"./voxelModels", "soft_label":True, "training_categories":"03001627"})
         a.train()
             
