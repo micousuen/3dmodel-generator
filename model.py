@@ -29,7 +29,7 @@ class Generator(nn.Module):
             }
         # Display settings 
         for key in self.args:
-            Utils().info("<Generator> Set ", key, " to ", self.args[key])
+            Utils().info("<Genrt> Set <{0:>35}> to <{1}>".format(key, self.args[key]))
         
         firstLayer_padding = (0, 0, 0) if self.cube_len == 64 else (1, 1, 1)
         
@@ -108,7 +108,7 @@ class Discriminator(nn.Module):
         
         # Display settings 
         for key in self.args:
-            Utils().info("<Discriminator> Set ", key, " to ", self.args[key])
+            Utils().info("<Dicmt> Set <{0:>35}> to <{1}>".format(key, self.args[key]))
         
         self.layer1_conv = nn.Sequential(
                 nn.Conv3d(1, self.cube_len, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 

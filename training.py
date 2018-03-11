@@ -4,16 +4,14 @@ Created on Mar 9, 2018
 @author: micou
 '''
 import os
-import time
+#import time
 import numpy as np
-from itertools import count
+#from itertools import count
 from multiprocessing import Process, Pipe
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms as T
 from torch.autograd import Variable
 
 import dataIO
@@ -46,7 +44,7 @@ class Train(Utils):
             training_categories:              str,              default ''                      which means all categories. use space to split different categories
             data_rootpath:                    str,              default VOXEL_MODEL_ROOTPATH in setting.py
             leakyrelu_value:                  float,            default 0.2
-            soft_label:                       bool,             default False.                  Enable soft_label value, real -> [0.7, 1], fake -> [0, 0.3] 
+            soft_label:                       bool,             default False.                  Enable soft_label value, real -> [0.7, 1.2], fake -> [0, 0.3] 
             generator_learningRate:           float,            default 0.0025
             adam_beta:                        tuple of floats,  defualt (0.5, 0.5)
             discriminator_learningRate:       float,            default 0.00001
@@ -55,7 +53,7 @@ class Train(Utils):
             resume:                           bool,             default True
             epoch_limit:                      int,              default -1.                     If -1 run forever and save currently best model
             checkpoint_filename:              str,              default './checkpoint.pth.tar'. Current best checkpoint file will have epoch number in front of this checkpoint file
-            save_model_interval:              int,              default 5.                      Save model every interval epochs
+            save_model_interval:              int,              default 50.                      Save model every interval iterations
         """
         
         self.args = {
@@ -76,12 +74,12 @@ class Train(Utils):
                 "leakyrelu_value": args["leakyrelu_value"] if "leakyrelu_value" in args else 0.2,
                 "soft_label": args["soft_label"] if "soft_label" in args else False, 
                 "g_d_training_rate": args["g_d_training_rate"] if "g_d_training_rate" in args else 1,
-                "save_model_interval":  args["save_model_interval"] if "save_model_interval" in args else 5
+                "save_model_interval":  args["save_model_interval"] if "save_model_interval" in args else 50
             }
         
         # Display settings 
         for key in self.args:
-            self.info("<Train> Set {0} to {1}".format(key, self.args[key]))
+            self.info("<Train> Set <{0:>35}> to <{1}>".format(key, self.args[key]))
             
         # Prepare data reader. It will start to prepare for data immediately. data_generator will yield nothing when meet the end of epoch
         # Use dataIO to shuffle data
@@ -109,6 +107,7 @@ class Train(Utils):
     def train(self):
         saved_iteration = self.iteration
         saved_epoch = self.epoch
+        last_epoch = self.epoch
         # If meet the epoch limit, our data_generator will automatically exit
         for batch in self.data_generator:
             self.epoch += batch[1] # if finished one epoch, flag at this position will be 1 (or greater if more than 1 epoch in one batch), otherwise this flag will be 0
@@ -137,13 +136,17 @@ class Train(Utils):
                 #************* Train Discriminator ************
                 latent_vectors = self._get_latentVectors(self.args)
                 realDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.ones(self.args["batch_size"])
-                fakeDataLabel = torch.zeros(self.args["batch_size"]).cuda() if torch.cuda.is_available()  else torhc.zeros(self.args["batch_size"])
+                fakeDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available()  else torhc.ones(self.args["batch_size"])
                 
                 d_eval_real = self.discriminator(self.transform_var(realModels)).squeeze()
+#                 print(tuple(d_eval_real.data))
+#                 print(tuple(realDataLabel * realLabelFactor))
                 d_real_loss = self.loss_function(d_eval_real, self.transform_var(realDataLabel * realLabelFactor))
                 
                 fakeModels = self.generator(latent_vectors)
                 d_eval_fake = self.discriminator(self.transform_var(fakeModels)).squeeze()
+#                 print(tuple(d_eval_fake.data))
+#                 print(tuple(fakeDataLabel * fakeLabelFactor))
                 d_fake_loss = self.loss_function(d_eval_fake, self.transform_var(fakeDataLabel * fakeLabelFactor))
                 
                 d_loss = d_real_loss + d_fake_loss
@@ -199,16 +202,17 @@ class Train(Utils):
                 fakeModels = self.generator(latent_vectors)
                 fakeModelEvaluation = self.discriminator(fakeModels).squeeze()
                 # Wrap label with variable so it can cal gradient
-                realLabel = self.transform_var(torch.ones(self.args["batch_size"]) * realLabelFactor)
+                realLabel = self.transform_var(torch.ones(self.args["batch_size"]).type(Tensor) * realLabelFactor)
                 generator_loss = self.loss_function(fakeModelEvaluation, realLabel)
                 
+                g_confuse_average = torch.mean(fakeModelEvaluation.data)
                 g_confuse_rate = torch.mean(fakeModelEvaluation.data.ge(0.5).float())
                 
                 self.discriminator.zero_grad()
                 self.generator.zero_grad()
                 generator_loss.backward()
                 self.generator_optim.step()
-                return (g_confuse_rate, generator_loss.data[0])
+                return (g_confuse_average, generator_loss.data[0], g_confuse_rate)
             
             # Based on g_d_training_rate, train our model
             if self.args["g_d_training_rate"] >= 1:
@@ -220,15 +224,20 @@ class Train(Utils):
                 for _ in range(int(1/self.args["g_d_training_rate"])):
                     d_info = train_discriminator_vanilla()
             
-            self.info("E {0} I {1} -->".format(self.epoch, self.iteration), "D: accuracy <{0}>, real loss <{1}>, fake loss <{2}>".format(*d_info)," G: confused rate <{0}>, generator loss <{1}>".format(*g_info))
+            self.info("E {0:<3} I {1:<3} --> ".format(self.epoch, self.iteration), \
+                      "D: accu <{0:3.2f}%>, ge_loss <{3:.4f}>, rl_l <{1:.4f}>, fk_l <{2:.4f}> | ".format(d_info[0]*100, d_info[1], d_info[2], d_info[1]+d_info[2]),\
+                      "G: pass rate <{2:3.2f}%>, loss <{1:.4f}>, avg score <{0:.4f}>".format(g_info[0], g_info[1], g_info[2]*100))
             
-            if self.epoch - saved_epoch > self.args["save_model_interval"]:
-                self._save_status(self.args["checkpoint_filename"])
-                self.info("Checkpoint filesaved at", self.args["checkpoint_filename"])
-                saved_epoch = self.epoch
+            if self.epoch - last_epoch >= 1:
+                if (self.epoch - saved_epoch)%int(self.args["save_model_interval"]) == 0:
+                    cp_dir, cp_file = os.path.split(self.args["checkpoint_filename"])
+                    self._save_status(os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
+                    self.info("Epoch Checkpoint filesaved at", os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
+                    saved_epoch = self.epoch
+                last_epoch = self.epoch
                 self.iteration = 0 
                 saved_iteration = 0
-            if self.iteration - saved_iteration > self.args["save_model_interval"] * 100:
+            if self.iteration - saved_iteration >= self.args["save_model_interval"]:
                 self._save_status(self.args["checkpoint_filename"])
                 self.info("Checkpoint filesaved at", self.args["checkpoint_filename"])
                 saved_iteration = self.iteration
@@ -275,10 +284,10 @@ class Train(Utils):
         
         if args["latent_vector_type"].lower() == "normal":
             # Use normal distributed latent vectors between [0, 1], mean = 0.5, std = 0.33
-            latent_vectors = self.transform_var(torch.clamp(Tensor(args["batch_size"], args["latent_vector_size"]).normal_(mean=0.5, std=0.33), 0, 1))
+            latent_vectors = self.transform_var(torch.clamp(FloatTensor(args["batch_size"], args["latent_vector_size"]).normal_(mean=0.5, std=0.33), 0, 1))
         elif args["latent_vector_type"].lower() == "uniform":
             # Use uniform distributed latent vectors between [0, 1]
-            latent_vectors = self.transform_var(Tensor(args["batch_size"], args["latent_vector_size"]).random_(0, to=1))
+            latent_vectors = self.transform_var(FloatTensor(args["batch_size"], args["latent_vector_size"]).uniform_(0, 1))
         else:
             # If latent_vector_type is unknown, use all zeros
             latent_vectors = self.transform_var(torch.zeros(args["batch_size"], args["latent_vector_size"]))
@@ -379,6 +388,6 @@ class Train(Utils):
         super(Train, self).error(*args)
     
 if __name__ == "__main__":
-        a = Train({"epoch_limit":-1, "batch_size":50, "cube_len":64, "data_rootpath":"./voxelModels", "soft_label":True, "training_categories":"03001627"})
+        a = Train({"epoch_limit":-1, "batch_size":60, "cube_len":64, "data_rootpath":"./voxelModels", "soft_label":True, "training_categories":"03001627"})
         a.train()
             
