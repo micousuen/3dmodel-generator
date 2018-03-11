@@ -106,7 +106,7 @@ class Train(Utils):
     
     def train(self):
         saved_iteration = self.iteration
-        saved_epoch = self.epoch
+        saved_epoch = 0
         last_epoch = self.epoch
         # If meet the epoch limit, our data_generator will automatically exit
         for batch in self.data_generator:
@@ -225,11 +225,11 @@ class Train(Utils):
                     d_info = train_discriminator_vanilla()
             
             self.info("E {0:<3} I {1:<3} --> ".format(self.epoch, self.iteration), \
-                      "D: accu <{0:3.2f}%>, ge_loss <{3:.4f}>, rl_l <{1:.4f}>, fk_l <{2:.4f}> | ".format(d_info[0]*100, d_info[1], d_info[2], d_info[1]+d_info[2]),\
-                      "G: pass rate <{2:3.2f}%>, loss <{1:.4f}>, avg score <{0:.4f}>".format(g_info[0], g_info[1], g_info[2]*100))
+                      "D: accu <{0:>3.2f}%>, ge_loss <{3:.4f}>, rl_l <{1:.4f}>, fk_l <{2:.4f}> | ".format(d_info[0]*100, d_info[1], d_info[2], d_info[1]+d_info[2]),\
+                      "G: pass rate <{2:>3.2f}%>, loss <{1:.4f}>, avg score <{0:.4f}>".format(g_info[0], g_info[1], g_info[2]*100))
             
             if self.epoch - last_epoch >= 1:
-                if (self.epoch - saved_epoch)%int(self.args["save_model_interval"]) == 0:
+                if (self.epoch)%int(self.args["save_model_interval"]) == 0:
                     cp_dir, cp_file = os.path.split(self.args["checkpoint_filename"])
                     self._save_status(os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
                     self.info("Epoch Checkpoint filesaved at", os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
