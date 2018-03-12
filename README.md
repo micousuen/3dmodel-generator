@@ -1,16 +1,31 @@
 # 3D-printable model generator
 
+## Project Description
+This project is trying to use neural network and structural analysis to automatically generate new 3D printable models. 
+
+Currently we will use 3D-GAN which runs on GPU to generate 3D models and use other algorithms running on CPU to make generated model 3D printable.
+
+## Project Source File
+
 * dataIO.py: data input and output model, and can transform mesh model to voxel model
 * setting.py: global setting variables
 * view.py: tools to visualize model or result
+* model.py: design neural network model to generate 3D models. 
+* training.py: to train models generator use model designed at model.py. Use PyTorch to train 3D-GAN network to generate voxel models. So useful Reference:
+    - 3D-GAN: http://3dgan.csail.mit.edu/
+    - 3DGAN Tensorflow implementation: https://github.com/meetshah1995/tf-3dgan
+    - 3DGAN PyTorch implementation: https://github.com/rimchang/3DGAN-Pytorch
 * utils.py: some auxiliary functions, all other class will inherit this class
 
-## Package Requirement
-1. pathos: for multiprocessing, get from "pip install git+https://github.com/uqfoundation/dill.git@master" and "pip install git+https://github.com/uqfoundation/pathos.git@master"
-2. trimesh: to read model and transform it, get from "pip install trimesh"
+
+## Environment Requirement
+1. nvidia drive, cuda 8.0+
+2. pytorch 
+3. pathos: for multiprocessing, get from "pip install git+https://github.com/uqfoundation/dill.git@master" and "pip install git+https://github.com/uqfoundation/pathos.git@master"
+4. trimesh: to read model and transform it, get from "pip install trimesh"
 
 ## ChangeLog
-20180310
+20180310 & 20180311
 * Fix some training problems. 
 
 20180309
