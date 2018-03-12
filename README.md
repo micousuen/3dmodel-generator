@@ -5,6 +5,19 @@ This project is trying to use neural network and structural analysis to automati
 
 Currently we will use 3D-GAN which runs on GPU to generate 3D models and use other algorithms running on CPU to make generated model 3D printable.
 
+Some models in dataset.
+
+<table>
+<tr>
+    <td><img src="./doc/1a74a83fa6d24b3cacd67ce2c72c02e_model_normalized.png" width="200"></td>
+    <td><img src="./doc/1be0108997e6aba5349bb1cbbf9a4206_model_normalized.png" width="200"></td>
+    <td><img src="./doc/1da9942b2ab7082b2ba1fdc12ecb5c9e_model_normalized.png" width="200"></td>
+    <td><img src="./doc/1e2ddaef401676915a7934ad3293bab5_model_normalized.png" width="200"></td>
+</tr>
+</table>
+
+Models generate by neural network...Still training ^_^
+
 ## Project Source File
 
 * dataIO.py: data input and output model, and can transform mesh model to voxel model
