@@ -5,7 +5,7 @@ This project is trying to use neural network and structural analysis to automati
 
 Currently we will use 3D-GAN which runs on GPU to generate 3D models and use other algorithms running on CPU to make generated model 3D printable.
 
-Some models in dataset.
+Some models in ShapeNet after pre-processing.
 
 <table>
 <tr>
@@ -24,10 +24,7 @@ Models generate by neural network...Still training ^_^
 * setting.py: global setting variables
 * view.py: tools to visualize model or result
 * model.py: design neural network model to generate 3D models. 
-* training.py: to train models generator use model designed at model.py. Use PyTorch to train 3D-GAN network to generate voxel models. So useful Reference:
-    - 3D-GAN: http://3dgan.csail.mit.edu/
-    - 3DGAN Tensorflow implementation: https://github.com/meetshah1995/tf-3dgan
-    - 3DGAN PyTorch implementation: https://github.com/rimchang/3DGAN-Pytorch
+* training.py: to train models generator use model designed at model.py. Use PyTorch to train 3D-GAN network to generate voxel models.
 * utils.py: some auxiliary functions, all other class will inherit this class
 
 
@@ -55,3 +52,8 @@ Models generate by neural network...Still training ^_^
 20180306 
 * Finished dataIO module, can read and write model, can transform mesh model to voxel model and save them. Can randomly yield models. 
 
+## Reference 
+* ShapeNet dataset: https://www.shapenet.org/, [Paper](https://arxiv.org/abs/1512.03012)
+* 3D-GAN: http://3dgan.csail.mit.edu/
+* 3DGAN Tensorflow implementation: https://github.com/meetshah1995/tf-3dgan
+* 3DGAN PyTorch implementation: https://github.com/rimchang/3DGAN-Pytorch
