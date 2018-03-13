@@ -136,7 +136,7 @@ class Train(Utils):
                 #************* Train Discriminator ************
                 latent_vectors = self._get_latentVectors(self.args)
                 realDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available() else torch.ones(self.args["batch_size"])
-                fakeDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available()  else torhc.ones(self.args["batch_size"])
+                fakeDataLabel = torch.ones(self.args["batch_size"]).cuda() if torch.cuda.is_available()  else torch.ones(self.args["batch_size"])
                 
                 d_eval_real = self.discriminator(self.transform_var(realModels)).squeeze()
 #                 print(tuple(d_eval_real.data))
