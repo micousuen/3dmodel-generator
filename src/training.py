@@ -32,10 +32,11 @@ class Train(Utils):
     data_process = None
     epoch = 0
     iteration = 0
+    loss_record = []
     
     def __init__(self, args={}):
         """
-        args require:
+        args optional:
             cube_len:                         int,              default 64
             latent_vector_size:               int,              default 200
             latent_vector_type:               str,              default "uniform",              in {"uniform","normal"}
@@ -51,9 +52,9 @@ class Train(Utils):
             discriminator_training_threshold: float,            default 0.8
             g_d_training_rate:                float,            default 1,                      recommend > 1
             resume:                           bool,             default True
-            epoch_limit:                      int,              default -1.                     If -1 run forever and save currently best model
+            epoch_limit:                      int,              default -1                      If -1 run forever and save currently best model
             checkpoint_filename:              str,              default './checkpoint.pth.tar'. Current best checkpoint file will have epoch number in front of this checkpoint file
-            save_model_interval:              int,              default 50.                      Save model every interval iterations
+            save_model_interval:              int,              default 50                      Save model every interval iterations
         """
         
         self.args = {
@@ -106,7 +107,6 @@ class Train(Utils):
     
     def train(self):
         saved_iteration = self.iteration
-        saved_epoch = 0
         last_epoch = self.epoch
         # If meet the epoch limit, our data_generator will automatically exit
         for batch in self.data_generator:
@@ -157,6 +157,7 @@ class Train(Utils):
                 if torch.is_tensor(d_accuracy):
                     d_accuracy = d_accuracy[0]
                 
+                # Only update discriminator when accuracy below a certain threshold
                 if d_accuracy <= self.args["discriminator_training_threshold"]:
                     self.generator.zero_grad()
                     self.discriminator.zero_grad()
@@ -205,9 +206,11 @@ class Train(Utils):
                 realLabel = self.transform_var(torch.ones(self.args["batch_size"]).type(Tensor) * realLabelFactor)
                 generator_loss = self.loss_function(fakeModelEvaluation, realLabel)
                 
+                # Calculate some info for log
                 g_confuse_average = torch.mean(fakeModelEvaluation.data)
                 g_confuse_rate = torch.mean(fakeModelEvaluation.data.ge(0.5).float())
                 
+                # Update our generator
                 self.discriminator.zero_grad()
                 self.generator.zero_grad()
                 generator_loss.backward()
@@ -225,18 +228,22 @@ class Train(Utils):
                     d_info = train_discriminator_vanilla()
             
             self.info("E {0:<3} I {1:<3} --> ".format(self.epoch, self.iteration), \
-                      "D: accu <{0:>3.2f}%>, ge_loss <{3:.4f}>, rl_l <{1:.4f}>, fk_l <{2:.4f}> | ".format(d_info[0]*100, d_info[1], d_info[2], d_info[1]+d_info[2]),\
-                      "G: pass rate <{2:>3.2f}%>, loss <{1:.4f}>, avg score <{0:.4f}>".format(g_info[0], g_info[1], g_info[2]*100))
+                      "D: accu <{0:>6.2f}%>, ge_loss <{3:.4f}>, rl_l <{1:.4f}>, fk_l <{2:.4f}> | ".format(d_info[0]*100, d_info[1], d_info[2], d_info[1]+d_info[2]),\
+                      "G: pass rate <{2:>6.2f}%>, loss <{1:.4f}>, avg score <{0:.4f}>".format(g_info[0], g_info[1], g_info[2]*100))
+            it_loss_record = {"epoch":self.epoch, "iteration":self.iteration, "D_info": d_info, "G_info": g_info}
+            self.loss_record.append(it_loss_record)
             
+            # Save model data every save_model_interval epochs, name it differently to other checkpoints. 
+            # Clear iteration count and last_epoch record at the end of each epoch
             if self.epoch - last_epoch >= 1:
                 if (self.epoch)%int(self.args["save_model_interval"]) == 0:
                     cp_dir, cp_file = os.path.split(self.args["checkpoint_filename"])
                     self._save_status(os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
                     self.info("Epoch Checkpoint filesaved at", os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
-                    saved_epoch = self.epoch
                 last_epoch = self.epoch
-                self.iteration = 0 
-                saved_iteration = 0
+                saved_iteration = 0-(self.iteration-saved_iteration)
+                self.iteration = 0
+            # Save model data every save_model_interval iterations, then clear iteration record
             if self.iteration - saved_iteration >= self.args["save_model_interval"]:
                 self._save_status(self.args["checkpoint_filename"])
                 self.info("Checkpoint filesaved at", self.args["checkpoint_filename"])
@@ -353,7 +360,8 @@ class Train(Utils):
                     "generator_optim":self.generator_optim.state_dict(), 
                     "discriminator_model":self.discriminator.state_dict(), 
                     "discriminator_optim":self.discriminator_optim.state_dict(),
-                    "epoch_count":self.epoch
+                    "epoch_count":self.epoch, 
+                    "loss_record":self.loss_record
                 }
         except:
             self.warn("cannot get checkpoint from models")
@@ -376,9 +384,13 @@ class Train(Utils):
             self.generator_optim.load_state_dict(self.checkpoint["generator_optim"])
             self.discriminator.load_state_dict(self.checkpoint["discriminator_model"])
             self.discriminator_optim.load_state_dict(self.checkpoint["discriminator_optim"])
-            self.epoch = self.checkpoint["epoch_count"]
-        except:
-            self.warn("cannot load models, check models")
+            # Some extra info, not necessary for them to be there, if missing use default value to replace them
+            self.epoch = self.checkpoint["epoch_count"] if "epoch_count" in self.checkpoint else 0
+            self.loss_record = self.checkpoint["loss_record"] if "loss_record" in self.checkpoint else []
+            if self.epoch == 0 or self.loss_record == []:
+                self.warn("epoch and loss_record not found in checkpoint, use default value")
+        except Exception as e:
+            self.warn("checkpoint don't match, check models ", type(e).__name__)
             return False
         return True
     

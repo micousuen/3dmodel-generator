@@ -42,11 +42,15 @@ class Generator(nn.Module):
                 nn.ReLU()
             )
         
+        self.layer1_deconv = nn.DataParallel(self.layer1_deconv)
+        
         self.layer2_deconv = nn.Sequential(
                 nn.ConvTranspose3d(self.cube_len*8, self.cube_len*4, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*4), 
                 nn.ReLU()
             )
+        
+        self.layer2_deconv = nn.DataParallel(self.layer2_deconv)
         
         self.layer3_deconv = nn.Sequential(
                 nn.ConvTranspose3d(self.cube_len*4, self.cube_len*2, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
@@ -54,16 +58,22 @@ class Generator(nn.Module):
                 nn.ReLU()
             )
         
+        self.layer3_deconv = nn.DataParallel(self.layer3_deconv)
+        
         self.layer4_deconv = nn.Sequential(
                 nn.ConvTranspose3d(self.cube_len*2, self.cube_len, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len), 
                 nn.ReLU()
             )
         
+        self.layer4_deconv = nn.DataParallel(self.layer4_deconv)
+        
         self.layer5 = nn.Sequential(
                 nn.ConvTranspose3d(self.cube_len, 1, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.Sigmoid()
             )
+        
+        self.layer5 = nn.DataParallel(self.layer5)
         
     def forward(self, latent_vector):
         out = latent_vector.view(-1, self.latent_vector_size, 1, 1, 1)
@@ -116,11 +126,15 @@ class Discriminator(nn.Module):
                 nn.LeakyReLU(self.leakyrelu_value)
             )
         
+        self.layer1_conv = nn.DataParallel(self.layer1_conv)
+        
         self.layer2_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len, self.cube_len*2, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*2), 
                 nn.LeakyReLU(self.leakyrelu_value)
             )
+        
+        self.layer2_conv = nn.DataParallel(self.layer2_conv)
         
         self.layer3_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len*2, self.cube_len*4, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
@@ -128,16 +142,22 @@ class Discriminator(nn.Module):
                 nn.LeakyReLU(self.leakyrelu_value)
             )
         
+        self.layer3_conv = nn.DataParallel(self.layer3_conv)
+        
         self.layer4_conv = nn.Sequential(
                 nn.Conv3d(self.cube_len*4, self.cube_len*8, kernel_size=4, stride=2, bias=self.bias_flag, padding=(1, 1, 1)), 
                 nn.BatchNorm3d(self.cube_len*8), 
                 nn.LeakyReLU(self.leakyrelu_value)
             )
         
+        self.layer4_conv = nn.DataParallel(self.layer4_conv)
+        
         self.layer5 = nn.Sequential(
                 nn.Conv3d(self.cube_len*8, 1, kernel_size=4, stride=2, bias=self.bias_flag, padding=lastLayer_padding), 
                 nn.Sigmoid()
             )
+        
+        self.layer5 = nn.DataParallel(self.layer5)
         
     def forward(self, input_model):
         out = input_model.view(-1, 1, self.cube_len, self.cube_len, self.cube_len)
