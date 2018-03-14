@@ -9,6 +9,7 @@ Created on Mar 5, 2018
 
 SHAPENET_MODEL_ROOTPATH =  "./test_folder"#"/home/micou/ShapeNetCore.v2/"
 VOXEL_MODEL_ROOTPATH = "./test_mat"
+IMAGE_OUTPUT_ROOTPATH = "./status"
 
 if __name__ == "__main__":
     print(SHAPENET_MODEL_ROOTPATH)

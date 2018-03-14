@@ -48,6 +48,7 @@ if __name__ == "__main__":
     args.add_argument("-z", "--checkpoint_filename", dest="z", default="./checkpoint.pth.tar", help="path to store checkpoint")
     args.add_argument("-x", "--g_d_training_rate", dest="x", default=1, help="generator discriminator training rate, default 1, don't recommend to change it")
     args.add_argument("-y", "--save_model_interval", dest="y", default=50, type=int, help="save model every this number of intervals.")
+    args.add_argument("-u", "--visual_status", dest="u", action="store_true", help="use window to visual status, cannot run in backend mode")    
     
     ag = args.parse_args()
     if [ag.D, ag.V, ag.T].count(True) > 1:
@@ -100,7 +101,8 @@ if __name__ == "__main__":
                 "leakyrelu_value": ag.k,
                 "soft_label": ag.s, 
                 "g_d_training_rate": ag.x,
-                "save_model_interval":  ag.y
+                "save_model_interval":  ag.y,
+                "visual_status": ag.u
             }
         runTraining = Train(arg_dict)
         runTraining.train()

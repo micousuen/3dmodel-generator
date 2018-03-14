@@ -35,7 +35,10 @@ Models generate by neural network...Still training ^_^
 4. trimesh: to read model and transform it, get from "pip install trimesh"
 
 ## ChangeLog
-20180310 & 20180311 & 20180313
+20180313
+* Add visualize process and will save module after every epoch's training
+
+20180310 & 20180311
 * Fix some training problems. 
 * Reorganizd project
 * Add main.py as interface to call other modules

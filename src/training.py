@@ -7,6 +7,7 @@ import os
 #import time
 import numpy as np
 #from itertools import count
+import matplotlib.pyplot as plt
 from multiprocessing import Process, Pipe
 
 import torch
@@ -15,9 +16,12 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 import dataIO
+from view import View
 from utils import Utils
 from dataIO import DataIO
+from setting import IMAGE_OUTPUT_ROOTPATH
 from model import Generator, Discriminator
+from jinja2.compiler import generate
 
 # if gpu is to be used
 use_cuda = torch.cuda.is_available()
@@ -30,6 +34,8 @@ class Train(Utils):
     # pipeline for multiprocessing data preparation
     data_send, data_recv = Pipe()
     data_process = None
+    view_send, view_recv = Pipe()
+    view_process = None
     epoch = 0
     iteration = 0
     loss_record = []
@@ -55,6 +61,7 @@ class Train(Utils):
             epoch_limit:                      int,              default -1                      If -1 run forever and save currently best model
             checkpoint_filename:              str,              default './checkpoint.pth.tar'. Current best checkpoint file will have epoch number in front of this checkpoint file
             save_model_interval:              int,              default 50                      Save model every interval iterations
+            visual_status:                    bool,             default False                   Show image of current status on windows
         """
         
         self.args = {
@@ -75,7 +82,8 @@ class Train(Utils):
                 "leakyrelu_value": args["leakyrelu_value"] if "leakyrelu_value" in args else 0.2,
                 "soft_label": args["soft_label"] if "soft_label" in args else False, 
                 "g_d_training_rate": args["g_d_training_rate"] if "g_d_training_rate" in args else 1,
-                "save_model_interval":  args["save_model_interval"] if "save_model_interval" in args else 50
+                "save_model_interval":  args["save_model_interval"] if "save_model_interval" in args else 50,
+                "visual_status": args["visual_status"] if "visual_status" in args else False
             }
         
         # Display settings 
@@ -235,7 +243,7 @@ class Train(Utils):
             
             # Save model data every save_model_interval epochs, name it differently to other checkpoints. 
             # Clear iteration count and last_epoch record at the end of each epoch
-            if self.epoch - last_epoch >= 1:
+            if self.epoch - last_epoch >= 1: 
                 if (self.epoch)%int(self.args["save_model_interval"]) == 0:
                     cp_dir, cp_file = os.path.split(self.args["checkpoint_filename"])
                     self._save_status(os.path.join(cp_dir, str(self.epoch)+"_"+cp_file))
@@ -243,6 +251,28 @@ class Train(Utils):
                 last_epoch = self.epoch
                 saved_iteration = 0-(self.iteration-saved_iteration)
                 self.iteration = 0
+                len_loss_record = len(self.loss_record)
+                # Prepare info to display
+                def prepare_status_info():
+                    status_info = [[[],[[self.loss_record[n]["D_info"][1] for n in range(len_loss_record)], \
+                                        [self.loss_record[n]["D_info"][2] for n in range(len_loss_record)]]],\
+                                   [[],[[self.loss_record[n]["G_info"][1] for n in range(len_loss_record)],\
+                                        [self.loss_record[n]["G_info"][0] for n in range(len_loss_record)]]],\
+                                   [[],[[self.loss_record[n]["D_info"][1]+self.loss_record[n]["D_info"][2] for n in range(len_loss_record)],
+                                        [self.loss_record[n]["G_info"][1] for n in range(len_loss_record)]]]]
+                    return status_info
+                def prepare_generated_model():
+                    # Run generator to get voxel model
+                    lv = self._get_latentVectors({"latent_vector_size":self.args["latent_vector_size"], "latent_vector_type":"uniform", "batch_size":1})
+                    if torch.cuda.is_available():
+                        generate_model = self.generator(lv).squeeze().data.ge(0.5).float().cpu().numpy().astype(np.bool)
+                    else:
+                        generate_model = self.generator(lv).squeeze().data.ge(0.5).float().numpy().astype(np.bool)
+                    self.info("random model generated")
+                    return generate_model
+                self._visual_data(prepare_status_info())
+                self._visual_data(prepare_generated_model())
+                
             # Save model data every save_model_interval iterations, then clear iteration record
             if self.iteration - saved_iteration >= self.args["save_model_interval"]:
                 self._save_status(self.args["checkpoint_filename"])
@@ -276,7 +306,6 @@ class Train(Utils):
         # Type of result is same as oneDimMask
         return result.type(oneDimMask.type())
         
-    
     def _get_latentVectors(self, args):
         """
         args should have latent_vector_size, latent_vector_type, batch_size key, otherwise program will raise exception
@@ -314,7 +343,7 @@ class Train(Utils):
             obj = obj.cuda()
         return Variable(obj)
     
-    def _get_tensorInputData(self, data_pipeline):    
+    def _process_readData(self, data_pipeline):    
         """
         Use pipeline to receive data. This should start as another process.
         Once it finished data reading and send it out, it will get blocked and wait for True from pipe
@@ -339,7 +368,7 @@ class Train(Utils):
         Start another process to read data and make it read. 
         This process will get data ready when you are doing other things
         """
-        self.data_process = Process(target=Train._get_tensorInputData, args=(self, self.data_send))
+        self.data_process = Process(target=Train._process_readData, args=(self, self.data_send))
         self.data_process.start()
         while True:
             self.data_recv.send(True)
@@ -352,7 +381,72 @@ class Train(Utils):
                 break
         self.data_process.terminate()
         self.data_process = None
+    
+    def _process_visualData(self, view_pipeline):
+        """
+        Process to visualize data based on its type
+        if give False, exit
+        if give [ndarray, prefix_str], visualize voxel model
+        if give [status_info, prefix_str], visualize status info
+        """
+        self.info("Prepare to visualize data")
+        self.viewObj = View()
+        exit_flag = False
+        voxel_fig = plt.figure()
+        info_fig = plt.figure()
+        output_dir = IMAGE_OUTPUT_ROOTPATH
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
+        while not exit_flag:
+            dataToVisual = view_pipeline.recv()
+            # If receive false, exit
+            if isinstance(dataToVisual, bool):
+                if not dataToVisual:
+                    exit_flag = True
+                    break
+            if isinstance(dataToVisual, tuple) or isinstance(dataToVisual, list):
+                if isinstance(dataToVisual[0], np.ndarray):
+                    if dataToVisual[0].dtype != np.bool:
+                        self.warn("Illegal voxel data to visual, should be np.bool type")
+                        continue
+                    self.viewObj.visual_voxel(dataToVisual[0], showWindow=self.args["visual_status"], saveImage=True, figure=voxel_fig, savefile_dest=os.path.join(output_dir, dataToVisual[1]+"_voxel.png"))
+                elif isinstance(dataToVisual[0], tuple) or isinstance(dataToVisual[0], list):
+                    self.viewObj.visual_dataGraph(dataToVisual[0], showWindow=self.args["visual_status"], saveImage=True, figure=info_fig, savefile_dest=os.path.join(output_dir, dataToVisual[1]+"_info.png"))
+                else:
+                    self.warn("Unknown data to visualize")
+            else:
+                self.warn("Illegal data give to visual process")
+                continue
+        view_pipeline.close()
         
+    def _visual_data(self, dataToVisual):
+        """
+        Start another process to visualize data
+        This process will get visualize data and status
+        """
+        # If we don't need visual status on windows, switch to backend to generate images
+        if not self.args["visual_status"]:
+            plt.switch_backend('agg')
+        
+        # Start visualize process if not start yet
+        if self.view_process == None:
+            self.view_process = Process(target=Train._process_visualData, args=(self, self.view_recv))
+            self.view_process.start()
+            
+        # Send data to visualize process
+        if isinstance(dataToVisual, np.ndarray):
+            self.view_send.send([dataToVisual, str(self.epoch)])
+        elif isinstance(dataToVisual, list) or isinstance(dataToVisual, tuple):
+            self.view_send.send([dataToVisual, str(self.epoch)])
+        elif isinstance(dataToVisual, False):
+            # Exit that process if received False
+            self.view_send.send(False)
+            self.view_process.join(1) # Try to wait for process close at first, if timeout then kill it
+            self.view_process.terminate()
+            self.view_process = None
+        else:
+            self.warn("Illegal data to visualize in _visual_data")
+            
     def _save_status(self, save_filename):
         try:
             self.checkpoint = {
@@ -397,6 +491,8 @@ class Train(Utils):
     def error(self, *args):
         if isinstance(self.data_process, Process):
             self.data_process.terminate()
+        if isinstance(self.view_process, Process):
+            self.view_process.terminate()
         super(Train, self).error(*args)
     
 if __name__ == "__main__":
