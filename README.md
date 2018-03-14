@@ -16,7 +16,16 @@ Some models in ShapeNet after pre-processing.
 </tr>
 </table>
 
-Models generate by neural network...Still training ^_^
+Models generate by neural network
+
+<table>
+<tr>
+    <td><img src="./doc/7_voxel.png" width="200"></td>
+    <td><img src="./doc/17_voxel.png" width="200"></td>
+    <td><img src="./doc/24_voxel.png" width="200"></td>
+    <td><img src="./doc/37_voxel.png" width="200"></td>
+</tr>
+</table>
 
 ## Project Source File
 
