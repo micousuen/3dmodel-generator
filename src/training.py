@@ -438,12 +438,13 @@ class Train(Utils):
             self.view_send.send([dataToVisual, str(self.epoch)])
         elif isinstance(dataToVisual, list) or isinstance(dataToVisual, tuple):
             self.view_send.send([dataToVisual, str(self.epoch)])
-        elif isinstance(dataToVisual, False):
-            # Exit that process if received False
-            self.view_send.send(False)
-            self.view_process.join(1) # Try to wait for process close at first, if timeout then kill it
-            self.view_process.terminate()
-            self.view_process = None
+        elif isinstance(dataToVisual, bool):
+            if dataToVisual == False:
+                # Exit that process if received False
+                self.view_send.send(False)
+                self.view_process.join(1) # Try to wait for process close at first, if timeout then kill it
+                self.view_process.terminate()
+                self.view_process = None
         else:
             self.warn("Illegal data to visualize in _visual_data")
             
@@ -484,8 +485,26 @@ class Train(Utils):
             if self.epoch == 0 or self.loss_record == []:
                 self.warn("epoch and loss_record not found in checkpoint, use default value")
         except Exception as e:
-            self.warn("checkpoint don't match, check models ", type(e).__name__)
-            return False
+            self.warn("checkpoint don't match, only load partial model")
+            try:
+                def load_partial_model(current_model, state_dict):
+                    current_g = current_model.state_dict()
+                    for name, param in state_dict.items():
+                        if not name in current_g:
+                            continue
+                        if isinstance(param, Parameter):
+                            param = param.data
+                        current_g[name].copy_(param)
+                load_partial_model(self.generator, self.checkpoint["generator_model"])
+                load_partial_model(self.discriminator, self.checkpoint["discriminator_model"])
+                self.warn("Will not load optim")
+                self.epoch = self.checkpoint["epoch_count"] if "epoch_count" in self.checkpoint else 0
+                self.loss_record = self.checkpoint["loss_record"] if "loss_record" in self.checkpoint else []
+                if self.epoch == 0 or self.loss_record == []:
+                    self.warn("epoch and loss_record not found in checkpoint, use default value")
+            except:
+                self.warn("Still have error in partial loading, check your model")
+                return False
         return True
     
     def error(self, *args):
