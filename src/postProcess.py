@@ -184,29 +184,44 @@ class ProcessPointCloud():
         Level 2: Compress vertices
         Level 3: Compress vertices, Compress faces
         '''
+        round_p = lambda x: tuple([round(i, 6) for i in x])
+        
         if compress_level == 1:
             return obj_v, obj_f
         elif compress_level == 2:
-            point_set = list(set(obj_v))
+            point_set = list(set([round_p(p) for p in obj_v]))
             point_dict = {c:i for i, c in enumerate(point_set, 1)}
             new_f = [None for _ in range(len(obj_f))]
             for i, c in enumerate(obj_f):
                 new_list = []
                 for v in c:
-                    new_list.append(point_dict[obj_v[v-1]])
-                new_f[i] = tuple(sorted(new_list))
+                    new_list.append(point_dict[round_p(obj_v[v-1])])
+                new_f[i] = tuple(new_list)
             return point_set, new_f
         elif compress_level == 3:
-            point_set = list(set(obj_v))
+            point_set = list(set([round_p(p) for p in obj_v]))
             point_dict = {c:i for i, c in enumerate(point_set, 1)}
             new_f = [None for _ in range(len(obj_f))]
             for i, c in enumerate(obj_f):
                 new_list = []
                 for v in c:
-                    new_list.append(point_dict[obj_v[v-1]])
-                new_f[i] = tuple(sorted(new_list))
-            new_f = list(set(new_f))
-            return point_set, new_f
+                    new_list.append(point_dict[round_p(obj_v[v-1])])
+                new_f[i] = tuple(new_list)
+                
+            new_f_sorted = [tuple(sorted(list(i))) for i in new_f]
+            new_f_dic = {}
+            for i in new_f_sorted:
+                if i in new_f_dic:
+                    new_f_dic[i] += 1
+                else:
+                    new_f_dic[i] = 1
+            new_f_no_dup = [i for i in new_f_dic if new_f_dic[i]==1]
+            new_f_return = []
+            for i in new_f:
+                t_i = tuple(sorted(list(i)))
+                if t_i in new_f_dic and new_f_dic[t_i]==1:
+                    new_f_return.append(i)
+            return point_set, new_f_return
         else:
             return obj_v, obj_f
 
@@ -218,25 +233,25 @@ class ProcessPointCloud():
         base_num = 0
         for p in point_cloud:
             result_v.append((p[0]+cube_len*0, p[1]+cube_len*0, p[2]+cube_len*0))
-            result_v.append((p[0]+cube_len*0, p[1]+cube_len*0, p[2]+cube_len*1))
-            result_v.append((p[0]+cube_len*0, p[1]+cube_len*1, p[2]+cube_len*0))
-            result_v.append((p[0]+cube_len*0, p[1]+cube_len*1, p[2]+cube_len*1))
             result_v.append((p[0]+cube_len*1, p[1]+cube_len*0, p[2]+cube_len*0))
-            result_v.append((p[0]+cube_len*1, p[1]+cube_len*0, p[2]+cube_len*1))
             result_v.append((p[0]+cube_len*1, p[1]+cube_len*1, p[2]+cube_len*0))
+            result_v.append((p[0]+cube_len*0, p[1]+cube_len*1, p[2]+cube_len*0))
+            result_v.append((p[0]+cube_len*0, p[1]+cube_len*0, p[2]+cube_len*1))
+            result_v.append((p[0]+cube_len*1, p[1]+cube_len*0, p[2]+cube_len*1))
             result_v.append((p[0]+cube_len*1, p[1]+cube_len*1, p[2]+cube_len*1))
-            result_f.append((base_num+1, base_num+2, base_num+4))
-            result_f.append((base_num+1, base_num+3, base_num+4))
-            result_f.append((base_num+1, base_num+2, base_num+6))
-            result_f.append((base_num+1, base_num+5, base_num+6))
-            result_f.append((base_num+1, base_num+3, base_num+5))
-            result_f.append((base_num+3, base_num+5, base_num+7))
-            result_f.append((base_num+2, base_num+4, base_num+6))
-            result_f.append((base_num+4, base_num+6, base_num+8))
-            result_f.append((base_num+5, base_num+6, base_num+8))
-            result_f.append((base_num+5, base_num+7, base_num+8))
-            result_f.append((base_num+3, base_num+4, base_num+8))
-            result_f.append((base_num+3, base_num+7, base_num+8))
+            result_v.append((p[0]+cube_len*0, p[1]+cube_len*1, p[2]+cube_len*1))
+            result_f.append((base_num+1, base_num+4, base_num+2))
+            result_f.append((base_num+2, base_num+4, base_num+3))
+            result_f.append((base_num+6, base_num+5, base_num+1))
+            result_f.append((base_num+6, base_num+1, base_num+2))
+            result_f.append((base_num+7, base_num+6, base_num+2))
+            result_f.append((base_num+2, base_num+3, base_num+7))
+            result_f.append((base_num+4, base_num+7, base_num+3))
+            result_f.append((base_num+4, base_num+8, base_num+7))
+            result_f.append((base_num+5, base_num+4, base_num+1))
+            result_f.append((base_num+5, base_num+8, base_num+4))
+            result_f.append((base_num+8, base_num+5, base_num+6))
+            result_f.append((base_num+8, base_num+6, base_num+7))
             base_num += 8
         return result_v, result_f 
 
