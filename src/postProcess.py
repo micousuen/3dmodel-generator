@@ -60,22 +60,24 @@ class ProcessPointCloud():
         # If more than 3 block exist in one plane, then make fulfill the hole
         def fill_hole(dataArray, neighbor_num = 3):
             hole_filled = 0
+            changed_file = np.zeros(dataArray.shape)
+            changed_file[dataArray>0] = 1
             for i in range(result_shape[0]):
                 for j in range(result_shape[1]):
                     for k in range(result_shape[2]):
                         if reduce(lambda x, y: x+y, [1 if dataArray[p[0], p[1], p[2]]!=0 else 0 for p in neighbor_list_x(i, j, k)]) >=neighbor_num and dataArray[i, j, k] == 0:
-                            dataArray[i, j, k] = 1
+                            changed_file[i, j, k] = 1
                             hole_filled += 1
                         if reduce(lambda x, y: x+y, [1 if dataArray[p[0], p[1], p[2]]!=0 else 0 for p in neighbor_list_y(i, j, k)]) >=neighbor_num and dataArray[i, j, k] == 0:
-                            dataArray[i, j, k] = 1
+                            changed_file[i, j, k] = 1
                             hole_filled += 1
                         if reduce(lambda x, y: x+y, [1 if dataArray[p[0], p[1], p[2]]!=0 else 0 for p in neighbor_list_z(i, j, k)]) >=neighbor_num and dataArray[i, j, k] == 0:
-                            dataArray[i, j, k] = 1
+                            changed_file[i, j, k] = 1
                             hole_filled += 1
-            return (dataArray, hole_filled)
+            return (changed_file, hole_filled)
         def iterative_fill_hole(dataArray, neighbor_num = 3):
             # iterative fill holes
-            iteration_limit = 1 if neighbor_num < 3 else 10
+            iteration_limit = 5 if neighbor_num < 3 else 10
             for i in range(iteration_limit): # at most 10 iterations, can exit early
                 dataArray, filled_num = fill_hole(dataArray, neighbor_num)
                 print("At fill hole iteration ", i, " , filled ", filled_num, " holes")
